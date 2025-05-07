@@ -1207,11 +1207,26 @@ elif app_mode == "About":
     st.title("About This Application")
     
     st.markdown("""
-    ## Sanskrit NLP & Data Analysis Platform
+    ## AI Code Generation & Sanskrit NLP Platform
     
-    This application combines specialized Sanskrit language processing with powerful data analysis capabilities.
+    This application provides comprehensive tools for code generation, repository analysis, 
+    and Sanskrit language processing with both online and offline capabilities.
     
     ### Key Features
+    
+    #### Code Generation
+    - Generate high-quality code based on natural language prompts
+    - Leverage advanced AI models like GPT-4 or Claude (when API keys are provided)
+    - Use local repository training for offline code generation
+    - Explain and optimize existing code
+    - Convert code between different programming languages
+    
+    #### Repository Training
+    - Download and analyze GitHub repositories
+    - Extract code snippets for offline use
+    - Find similar code based on patterns
+    - Generate code completions without external APIs
+    - Works completely offline with saved repository data
     
     #### Sanskrit NLP Module
     - Custom tokenization for Sanskrit text
@@ -1231,22 +1246,45 @@ elif app_mode == "About":
     - Visualize comparisons with interactive charts
     - Export comparison results
     
+    ### Operating Modes
+    
+    This application offers multiple operation modes:
+    
+    #### Online Mode
+    - Can clone and analyze GitHub repositories
+    - Optionally uses OpenAI or Anthropic APIs (if API keys are provided)
+    - Full functionality for all features
+    
+    #### Offline Mode
+    - Works without internet connectivity
+    - Uses locally saved code repositories
+    - No dependency on external cloud services
+    - All code analysis and generation happens locally
+    
     ### Technical Implementation
     
     This application is built with:
     - Streamlit for the web interface
-    - NLTK and spaCy for NLP foundations
-    - Custom Sanskrit processing extensions
+    - GitPython for repository management
+    - NLTK and custom algorithms for NLP
+    - Optional integrations with OpenAI and Anthropic
     - Pandas and NumPy for data manipulation
-    - Matplotlib and Plotly for visualizations
-    - scikit-learn for machine learning components
+    - Scikit-learn for code similarity analysis
+    - Plotly for interactive visualizations
+    
+    ### Default Repositories
+    
+    The application comes with:
+    - **Qiskit**: IBM's open-source quantum computing framework
+    - Add more repositories through the Repository Training section
     
     ### Usage Guidelines
     
     For best results:
+    - Save repository data for offline use
     - Use UTF-8 encoded text files for Sanskrit input
     - Ensure consistent formats across comparison datasets
     - Provide sufficient training data for model development
     """)
 
-    st.info("Created with ❤️ for Sanskrit language processing and data analysis")
+    st.info("Created with ❤️ for AI code generation, repository training, and Sanskrit language processing")

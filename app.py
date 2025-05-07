@@ -34,6 +34,14 @@ if 'generated_code' not in st.session_state:
     st.session_state.generated_code = None
 if 'code_history' not in st.session_state:
     st.session_state.code_history = []
+if 'repo_processor' not in st.session_state:
+    st.session_state.repo_processor = None
+if 'repos_data' not in st.session_state:
+    st.session_state.repos_data = {}
+if 'code_snippets' not in st.session_state:
+    st.session_state.code_snippets = []
+if 'similar_code' not in st.session_state:
+    st.session_state.similar_code = []
 
 # Create instances of utility classes
 sanskrit_nlp = SanskritNLP()
@@ -42,11 +50,16 @@ visualizer = Visualizer()
 model_trainer = ModelTrainer()
 code_generator = CodeGenerator()
 
+# Initialize repo processor if not already done
+if st.session_state.repo_processor is None:
+    from utils.repo_processor import RepoProcessor
+    st.session_state.repo_processor = RepoProcessor()
+
 # Sidebar navigation
 st.sidebar.title("Navigation")
 app_mode = st.sidebar.selectbox(
     "Choose a function",
-    ["Home", "Code Generation", "Sanskrit NLP", "Custom Model Training", "Data Comparison", "About"]
+    ["Home", "Code Generation", "Repository Training", "Sanskrit NLP", "Custom Model Training", "Data Comparison", "About"]
 )
 
 # Home page
@@ -69,12 +82,17 @@ if app_mode == "Home":
     Select a function from the sidebar to begin exploring the capabilities of this platform.
     """)
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         st.info("##### Code Generation\nGenerate code using powerful AI models")
         if st.button("Go to Code Generation", key="goto_code_gen"):
             app_mode = "Code Generation"
+            st.rerun()
+    
+        st.info("##### Repository Training\nTrain on programming language source code from GitHub")
+        if st.button("Go to Repository Training", key="goto_repo"):
+            app_mode = "Repository Training"
             st.rerun()
     
     with col2:
@@ -83,7 +101,6 @@ if app_mode == "Home":
             app_mode = "Sanskrit NLP"
             st.rerun()
             
-    with col3:
         st.info("##### Model Training\nTrain custom NLP models for specialized Sanskrit tasks")
         if st.button("Go to Model Training", key="goto_training"):
             app_mode = "Custom Model Training"
@@ -686,6 +703,262 @@ elif app_mode == "Code Generation":
                         st.code(history_item['result'])
                     
                     st.divider()
+
+# Repository Training page
+elif app_mode == "Repository Training":
+    st.title("Code Repository Training")
+    
+    st.markdown("""
+    ## Train on Programming Language Source Code
+    
+    This feature allows you to download, analyze, and learn from programming language source code repositories.
+    You can use this to train code generation models without needing external API keys.
+    
+    ### How it works:
+    1. Add GitHub repositories with source code
+    2. Process and extract code snippets
+    3. Analyze or search through the code
+    4. Use the extracted code to generate similar code
+    """)
+    
+    # Repository management section
+    st.subheader("Repository Management")
+    
+    # Add repository form
+    with st.form("add_repo_form"):
+        st.write("Add a GitHub Repository")
+        repo_url = st.text_input(
+            "GitHub Repository URL:", 
+            placeholder="https://github.com/username/repository"
+        )
+        
+        # Programming language selection
+        lang_options = ["Python", "JavaScript", "TypeScript", "Java", "C#", "C++", "Go", "Rust", "PHP", "Ruby", "Swift", "Kotlin"]
+        language = st.selectbox("Programming language:", lang_options)
+        
+        clone_depth = st.slider("Clone depth:", min_value=1, max_value=5, value=1, help="Shallow clone depth (1 is fastest)")
+        
+        submitted = st.form_submit_button("Add Repository")
+        
+        if submitted and repo_url:
+            with st.spinner(f"Cloning repository {repo_url}..."):
+                result = st.session_state.repo_processor.clone_repository(
+                    repo_url=repo_url,
+                    language=language,
+                    depth=clone_depth
+                )
+                
+                if result["success"]:
+                    st.success(result["message"])
+                    # Store info in session state
+                    repo_name = result["repo_name"]
+                    if 'repos_data' not in st.session_state:
+                        st.session_state.repos_data = {}
+                    st.session_state.repos_data[repo_name] = {
+                        "url": repo_url,
+                        "language": language,
+                        "processed": False
+                    }
+                else:
+                    st.error(result["message"])
+    
+    # Process repositories section
+    if st.session_state.repos_data:
+        st.subheader("Process Repositories")
+        
+        # Show available repositories
+        repos = list(st.session_state.repos_data.keys())
+        selected_repo = st.selectbox("Select repository to process:", repos)
+        
+        if selected_repo:
+            repo_info = st.session_state.repos_data[selected_repo]
+            
+            st.write(f"Repository: **{selected_repo}**")
+            st.write(f"Language: **{repo_info['language']}**")
+            st.write(f"URL: {repo_info['url']}")
+            st.write(f"Processed: {'✅ Yes' if repo_info.get('processed', False) else '❌ No'}")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Process button
+                if st.button("Process Repository", key=f"process_{selected_repo}"):
+                    with st.spinner(f"Processing {selected_repo}..."):
+                        # Optional parameters for processing
+                        max_files = 100  # Limit number of files to process
+                        min_lines = 5    # Minimum lines per snippet
+                        max_lines = 500  # Maximum lines per snippet
+                        
+                        result = st.session_state.repo_processor.process_repository(
+                            repo_name=selected_repo,
+                            max_files=max_files,
+                            min_lines=min_lines,
+                            max_lines=max_lines
+                        )
+                        
+                        if result["success"]:
+                            st.success(f"Processed {result['files_processed']} files, extracted {result['code_snippets']} code snippets")
+                            # Update repo info
+                            st.session_state.repos_data[selected_repo]["processed"] = True
+                            st.session_state.repos_data[selected_repo]["files_processed"] = result["files_processed"]
+                            st.session_state.repos_data[selected_repo]["code_snippets"] = result["code_snippets"]
+                            # Get code snippets for this repo
+                            snippets = st.session_state.repo_processor.get_all_code_snippets([repo_info["language"]])
+                            st.session_state.code_snippets = snippets
+                        else:
+                            st.error(result["message"])
+            
+            with col2:
+                # Remove button
+                if st.button("Remove Repository", key=f"remove_{selected_repo}"):
+                    with st.spinner(f"Removing {selected_repo}..."):
+                        result = st.session_state.repo_processor.cleanup_repository(selected_repo)
+                        
+                        if result["success"]:
+                            st.success(result["message"])
+                            # Remove from session state
+                            st.session_state.repos_data.pop(selected_repo, None)
+                            st.rerun()
+                        else:
+                            st.error(result["message"])
+        
+        # Export code snippets section
+        if st.session_state.code_snippets:
+            st.subheader("Code Snippets")
+            
+            st.write(f"Total snippets: {len(st.session_state.code_snippets)}")
+            
+            # Export options
+            export_col1, export_col2 = st.columns(2)
+            
+            with export_col1:
+                if st.button("Export to JSON"):
+                    with st.spinner("Exporting code snippets..."):
+                        # Export to JSON file
+                        result = st.session_state.repo_processor.export_to_json(
+                            output_path="code_snippets.json",
+                            languages=None,  # All languages
+                            min_lines=5,
+                            max_lines=None
+                        )
+                        
+                        if result["success"]:
+                            st.success(f"Exported {result['snippets_exported']} code snippets")
+                            
+                            # Create a download link for the JSON file
+                            with open("code_snippets.json", "r") as f:
+                                json_data = f.read()
+                                
+                            st.download_button(
+                                label="Download JSON",
+                                data=json_data,
+                                file_name="code_snippets.json",
+                                mime="application/json"
+                            )
+                        else:
+                            st.error(result["message"])
+            
+            with export_col2:
+                if st.button("Create DataFrame"):
+                    with st.spinner("Creating DataFrame..."):
+                        # Convert to DataFrame
+                        df = st.session_state.repo_processor.export_to_dataframe()
+                        
+                        st.write("Preview of code snippets DataFrame:")
+                        st.dataframe(df[["filename", "language", "line_count"]].head(10))
+            
+            # Code examples section
+            with st.expander("View Sample Code Snippets"):
+                num_samples = min(3, len(st.session_state.code_snippets))
+                
+                for i in range(num_samples):
+                    snippet = st.session_state.code_snippets[i]
+                    st.write(f"**{snippet['filename']}** ({snippet['language']}, {snippet['line_count']} lines)")
+                    st.code(snippet['code'][:1000] + "..." if len(snippet['code']) > 1000 else snippet['code'], language=snippet['language'].lower())
+                    st.divider()
+        
+        # Code search and similarity section
+        if st.session_state.code_snippets:
+            st.subheader("Code Search & Similarity")
+            
+            # Initialize vectorizer if not already done
+            if st.button("Initialize Code Similarity Engine"):
+                with st.spinner("Building code similarity model..."):
+                    vectorizer = st.session_state.repo_processor.initialize_vectorizer()
+                    if vectorizer:
+                        st.success("Code similarity engine initialized successfully!")
+                    else:
+                        st.error("Failed to initialize similarity engine. Please process repositories first.")
+            
+            # Code similarity search
+            st.write("#### Find Similar Code")
+            query_code = st.text_area(
+                "Enter code to find similar snippets:",
+                height=150,
+                placeholder="Paste code here to find similar examples..."
+            )
+            
+            if query_code and st.button("Find Similar Code"):
+                with st.spinner("Searching for similar code..."):
+                    similar_codes = st.session_state.repo_processor.find_similar_code(query_code, top_n=5)
+                    st.session_state.similar_code = similar_codes
+                    
+                    if similar_codes:
+                        st.success(f"Found {len(similar_codes)} similar code snippets")
+                    else:
+                        st.info("No similar code snippets found")
+            
+            # Display similar code
+            if st.session_state.similar_code:
+                st.write("#### Similar Code Snippets")
+                
+                for i, result in enumerate(st.session_state.similar_code):
+                    snippet = result["snippet"]
+                    similarity = result["similarity_score"]
+                    
+                    expander_title = f"{i+1}. {snippet['filename']} (Similarity: {similarity:.2f})"
+                    with st.expander(expander_title):
+                        st.write(f"**Language:** {snippet['language']}")
+                        st.write(f"**Path:** {snippet['path']}")
+                        st.write(f"**Lines:** {snippet['line_count']}")
+                        st.code(snippet['code'], language=snippet['language'].lower())
+
+            # Code completion section
+            st.write("#### Code Completion")
+            st.write("Use existing code to generate completions")
+            
+            partial_code = st.text_area(
+                "Enter partial code to complete:",
+                height=150,
+                placeholder="Start writing some code here..."
+            )
+            
+            if partial_code:
+                lang_options = ["Python", "JavaScript", "TypeScript", "Java", "C#", "C++"]
+                completion_lang = st.selectbox("Completion language:", lang_options, key="completion_lang")
+                
+                if st.button("Generate Completion"):
+                    with st.spinner("Generating code completion..."):
+                        completions = st.session_state.repo_processor.generate_code_completion(
+                            partial_code=partial_code,
+                            language=completion_lang,
+                            max_candidates=3,
+                            min_similarity=0.2
+                        )
+                        
+                        if completions:
+                            st.success(f"Generated {len(completions)} completion candidates")
+                            
+                            for i, candidate in enumerate(completions):
+                                score = candidate["score"]
+                                code = candidate["code"]
+                                
+                                with st.expander(f"Completion #{i+1} (Score: {score:.2f})"):
+                                    st.code(code, language=completion_lang.lower())
+                        else:
+                            st.info("Could not generate completions. Try adding more repositories or changing the partial code.")
+    else:
+        st.info("No repositories added yet. Add a repository using the form above.")
 
 # Data Comparison page
 elif app_mode == "Data Comparison":

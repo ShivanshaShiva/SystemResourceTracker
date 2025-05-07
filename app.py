@@ -54,6 +54,17 @@ code_generator = CodeGenerator()
 if st.session_state.repo_processor is None:
     from utils.repo_processor import RepoProcessor
     st.session_state.repo_processor = RepoProcessor()
+    
+    # Add default repositories information to session state if not present
+    if 'repos_data' not in st.session_state or not st.session_state.repos_data:
+        st.session_state.repos_data = {
+            "qiskit": {
+                "url": "https://github.com/Qiskit/qiskit",
+                "language": "Python",
+                "processed": False,
+                "description": "Qiskit is an open-source SDK for working with quantum computers"
+            }
+        }
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
@@ -721,46 +732,107 @@ elif app_mode == "Repository Training":
     4. Use the extracted code to generate similar code
     """)
     
+    # Offline mode toggle
+    offline_col1, offline_col2 = st.columns([1, 3])
+    with offline_col1:
+        offline_mode = st.checkbox("Offline Mode", value=st.session_state.repo_processor.offline_mode)
+        if offline_mode != st.session_state.repo_processor.offline_mode:
+            st.session_state.repo_processor.set_offline_mode(offline_mode)
+            st.rerun()
+    
+    with offline_col2:
+        if offline_mode:
+            st.info("📥 Offline mode active: Using locally saved code data. Download features disabled.")
+        else:
+            st.info("🌐 Online mode active: Can download repositories from GitHub.")
+    
     # Repository management section
     st.subheader("Repository Management")
     
-    # Add repository form
-    with st.form("add_repo_form"):
-        st.write("Add a GitHub Repository")
-        repo_url = st.text_input(
-            "GitHub Repository URL:", 
-            placeholder="https://github.com/username/repository"
-        )
+    # Add a tab UI for online/offline options
+    repo_tabs = st.tabs(["Add Repository", "Offline Data Management"])
+    
+    with repo_tabs[0]:
+        # Add repository form - disabled in offline mode
+        with st.form("add_repo_form"):
+            st.write("Add a GitHub Repository")
+            repo_url = st.text_input(
+                "GitHub Repository URL:", 
+                placeholder="https://github.com/username/repository",
+                disabled=offline_mode
+            )
+            
+            # Programming language selection
+            lang_options = ["Python", "JavaScript", "TypeScript", "Java", "C#", "C++", "Go", "Rust", "PHP", "Ruby", "Swift", "Kotlin"]
+            language = st.selectbox("Programming language:", lang_options)
+            
+            clone_depth = st.slider("Clone depth:", min_value=1, max_value=5, value=1, help="Shallow clone depth (1 is fastest)")
+            
+            submitted = st.form_submit_button("Add Repository", disabled=offline_mode)
+            
+            if offline_mode:
+                st.info("⚠️ Repository download disabled in offline mode. Switch to online mode to add repositories.")
+            
+            if submitted and repo_url:
+                with st.spinner(f"Cloning repository {repo_url}..."):
+                    result = st.session_state.repo_processor.clone_repository(
+                        repo_url=repo_url,
+                        language=language,
+                        depth=clone_depth
+                    )
+                    
+                    if result["success"]:
+                        st.success(result["message"])
+                        # Store info in session state
+                        repo_name = result["repo_name"]
+                        if 'repos_data' not in st.session_state:
+                            st.session_state.repos_data = {}
+                        st.session_state.repos_data[repo_name] = {
+                            "url": repo_url,
+                            "language": language,
+                            "processed": False
+                        }
+                    else:
+                        st.error(result["message"])
+    
+    with repo_tabs[1]:
+        st.write("#### Save/Load Code Data for Offline Use")
         
-        # Programming language selection
-        lang_options = ["Python", "JavaScript", "TypeScript", "Java", "C#", "C++", "Go", "Rust", "PHP", "Ruby", "Swift", "Kotlin"]
-        language = st.selectbox("Programming language:", lang_options)
+        offline_col1, offline_col2 = st.columns(2)
         
-        clone_depth = st.slider("Clone depth:", min_value=1, max_value=5, value=1, help="Shallow clone depth (1 is fastest)")
+        with offline_col1:
+            # Save data
+            if st.button("Save All Data for Offline Use", disabled=len(st.session_state.repos_data) == 0):
+                with st.spinner("Saving code data..."):
+                    result = st.session_state.repo_processor.save_code_data()
+                    if result["success"]:
+                        st.success(result["message"])
+                    else:
+                        st.error(result["message"])
         
-        submitted = st.form_submit_button("Add Repository")
-        
-        if submitted and repo_url:
-            with st.spinner(f"Cloning repository {repo_url}..."):
-                result = st.session_state.repo_processor.clone_repository(
-                    repo_url=repo_url,
-                    language=language,
-                    depth=clone_depth
-                )
-                
-                if result["success"]:
-                    st.success(result["message"])
-                    # Store info in session state
-                    repo_name = result["repo_name"]
-                    if 'repos_data' not in st.session_state:
-                        st.session_state.repos_data = {}
-                    st.session_state.repos_data[repo_name] = {
-                        "url": repo_url,
-                        "language": language,
-                        "processed": False
-                    }
-                else:
-                    st.error(result["message"])
+        with offline_col2:
+            # Load data
+            if st.button("Load Saved Data"):
+                with st.spinner("Loading saved code data..."):
+                    result = st.session_state.repo_processor.load_code_data()
+                    if result["success"]:
+                        st.success(result["message"])
+                        # Update session state with loaded repositories
+                        for repo_name in result.get("loaded_repos", []):
+                            if repo_name in st.session_state.repo_processor.repos:
+                                # Update or add to session state
+                                repo_info = st.session_state.repo_processor.repos[repo_name]
+                                if 'repos_data' not in st.session_state:
+                                    st.session_state.repos_data = {}
+                                st.session_state.repos_data[repo_name] = repo_info
+                        
+                        # Update code snippets
+                        all_snippets = st.session_state.repo_processor.get_all_code_snippets()
+                        st.session_state.code_snippets = all_snippets
+                        
+                        st.rerun()
+                    else:
+                        st.error(result["message"])
     
     # Process repositories section
     if st.session_state.repos_data:

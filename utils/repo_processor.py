@@ -29,9 +29,14 @@ class RepoProcessor:
         self.code_data = {}
         self.tokenizer = None
         self.vectorizer = None
+        self.offline_mode = False
         
         # Create temp directory if it doesn't exist
         os.makedirs(temp_dir, exist_ok=True)
+        
+        # Create a directory to save processed data for offline use
+        self.data_dir = "saved_code_data"
+        os.makedirs(self.data_dir, exist_ok=True)
         
         # File extensions to process for different languages
         self.language_extensions = {
@@ -482,3 +487,168 @@ class RepoProcessor:
             "total_code_snippets": total_snippets,
             "languages": languages
         }
+    
+    def save_code_data(self, repo_name=None):
+        """
+        Save code data to disk for offline use.
+        
+        Args:
+            repo_name (str, optional): Save data for a specific repository. 
+                                       If None, save all repositories' data.
+            
+        Returns:
+            dict: Results of the save operation
+        """
+        try:
+            if repo_name:
+                # Save data for a specific repository
+                if repo_name not in self.code_data:
+                    return {
+                        "success": False, 
+                        "message": f"Repository '{repo_name}' not found or not processed."
+                    }
+                
+                # Create a file for the repository
+                repo_file = os.path.join(self.data_dir, f"{repo_name}_code_data.json")
+                with open(repo_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.code_data[repo_name], f, indent=2)
+                
+                # Also save repository information
+                repo_info_file = os.path.join(self.data_dir, f"{repo_name}_info.json")
+                with open(repo_info_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.repos[repo_name], f, indent=2)
+                
+                return {
+                    "success": True,
+                    "message": f"Saved code data for repository '{repo_name}' to {repo_file}"
+                }
+            else:
+                # Save data for all repositories
+                saved_repos = []
+                
+                for repo_name in self.code_data.keys():
+                    repo_file = os.path.join(self.data_dir, f"{repo_name}_code_data.json")
+                    with open(repo_file, 'w', encoding='utf-8') as f:
+                        json.dump(self.code_data[repo_name], f, indent=2)
+                    
+                    # Also save repository information
+                    repo_info_file = os.path.join(self.data_dir, f"{repo_name}_info.json")
+                    with open(repo_info_file, 'w', encoding='utf-8') as f:
+                        json.dump(self.repos[repo_name], f, indent=2)
+                    
+                    saved_repos.append(repo_name)
+                
+                # Save the list of repositories
+                repos_list_file = os.path.join(self.data_dir, "repositories.json")
+                with open(repos_list_file, 'w', encoding='utf-8') as f:
+                    json.dump(list(self.repos.keys()), f, indent=2)
+                
+                return {
+                    "success": True,
+                    "saved_repos": saved_repos,
+                    "message": f"Saved code data for {len(saved_repos)} repositories to {self.data_dir}"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error saving code data: {str(e)}"
+            }
+    
+    def load_code_data(self, repo_name=None):
+        """
+        Load code data from disk for offline use.
+        
+        Args:
+            repo_name (str, optional): Load data for a specific repository. 
+                                       If None, load all repositories' data.
+            
+        Returns:
+            dict: Results of the load operation
+        """
+        try:
+            if repo_name:
+                # Load data for a specific repository
+                repo_file = os.path.join(self.data_dir, f"{repo_name}_code_data.json")
+                if not os.path.exists(repo_file):
+                    return {
+                        "success": False, 
+                        "message": f"No saved data found for repository '{repo_name}'."
+                    }
+                
+                # Load the code data
+                with open(repo_file, 'r', encoding='utf-8') as f:
+                    self.code_data[repo_name] = json.load(f)
+                
+                # Load repository information
+                repo_info_file = os.path.join(self.data_dir, f"{repo_name}_info.json")
+                if os.path.exists(repo_info_file):
+                    with open(repo_info_file, 'r', encoding='utf-8') as f:
+                        self.repos[repo_name] = json.load(f)
+                
+                return {
+                    "success": True,
+                    "message": f"Loaded code data for repository '{repo_name}' from {repo_file}",
+                    "snippets_loaded": len(self.code_data[repo_name])
+                }
+            else:
+                # Check if list of repositories exists
+                repos_list_file = os.path.join(self.data_dir, "repositories.json")
+                if os.path.exists(repos_list_file):
+                    with open(repos_list_file, 'r', encoding='utf-8') as f:
+                        repos = json.load(f)
+                else:
+                    # If no list file, try to find repository files
+                    repo_files = [f for f in os.listdir(self.data_dir) if f.endswith("_code_data.json")]
+                    repos = [f.replace("_code_data.json", "") for f in repo_files]
+                
+                if not repos:
+                    return {
+                        "success": False,
+                        "message": "No saved repository data found."
+                    }
+                
+                # Load data for all repositories
+                loaded_repos = []
+                total_snippets = 0
+                
+                for repo_name in repos:
+                    repo_file = os.path.join(self.data_dir, f"{repo_name}_code_data.json")
+                    if os.path.exists(repo_file):
+                        with open(repo_file, 'r', encoding='utf-8') as f:
+                            self.code_data[repo_name] = json.load(f)
+                        
+                        # Load repository information
+                        repo_info_file = os.path.join(self.data_dir, f"{repo_name}_info.json")
+                        if os.path.exists(repo_info_file):
+                            with open(repo_info_file, 'r', encoding='utf-8') as f:
+                                self.repos[repo_name] = json.load(f)
+                        
+                        loaded_repos.append(repo_name)
+                        total_snippets += len(self.code_data[repo_name])
+                
+                return {
+                    "success": True,
+                    "loaded_repos": loaded_repos,
+                    "total_snippets": total_snippets,
+                    "message": f"Loaded code data for {len(loaded_repos)} repositories with {total_snippets} total snippets"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error loading code data: {str(e)}"
+            }
+    
+    def set_offline_mode(self, offline=True):
+        """
+        Set the processor to work in offline mode.
+        
+        Args:
+            offline (bool): Whether to use offline mode
+            
+        Returns:
+            bool: New offline mode status
+        """
+        self.offline_mode = offline
+        return self.offline_mode

@@ -8,6 +8,7 @@ from utils.data_processor import DataProcessor
 from utils.visualizer import Visualizer
 from utils.model_trainer import ModelTrainer
 from utils.code_generator import CodeGenerator
+from utils.instruction_learner import InstructionLearner
 
 # Set page configuration
 st.set_page_config(
@@ -49,6 +50,7 @@ data_processor = DataProcessor()
 visualizer = Visualizer()
 model_trainer = ModelTrainer()
 code_generator = CodeGenerator()
+instruction_learner = InstructionLearner()
 
 # Initialize repo processor if not already done
 if st.session_state.repo_processor is None:
@@ -66,11 +68,19 @@ if st.session_state.repo_processor is None:
             }
         }
 
+# Initialize additional session states for instruction learning
+if 'learned_instructions' not in st.session_state:
+    st.session_state.learned_instructions = []
+if 'instruction_query' not in st.session_state:
+    st.session_state.instruction_query = ""
+if 'query_results' not in st.session_state:
+    st.session_state.query_results = None
+
 # Sidebar navigation
 st.sidebar.title("Navigation")
 app_mode = st.sidebar.selectbox(
     "Choose a function",
-    ["Home", "Code Generation", "Repository Training", "Sanskrit NLP", "Custom Model Training", "Data Comparison", "About"]
+    ["Home", "Code Generation", "Repository Training", "Sanskrit NLP", "General Instruction Learning", "Custom Model Training", "Data Comparison", "About"]
 )
 
 # Home page
@@ -85,6 +95,7 @@ if app_mode == "Home":
     ### Key Features
     - **AI Code Generation**: Generate high-quality code based on your instructions
     - **Sanskrit Text Analysis**: Process and analyze Sanskrit texts with custom NLP capabilities
+    - **General Instruction Learning**: Learn from natural language instructions in any language
     - **Custom NLP Model Training**: Train specialized models for Sanskrit language processing
     - **Data Comparison**: Compare predicted weights vs actual data with statistical analysis
     - **Visualization**: Generate insights through comprehensive data visualizations
@@ -141,6 +152,79 @@ elif app_mode == "Sanskrit NLP":
             st.session_state.sanskrit_text = stringio.read()
             st.write("File uploaded successfully!")
             st.text_area("File contents:", st.session_state.sanskrit_text, height=200)
+    
+    # Grammar Rule Learning
+    st.subheader("Grammar Rule Learning")
+    
+    st.markdown("""
+    Enter a Sanskrit grammar rule in natural language and the system will learn it.
+    For example: 
+    - "iko yan achi" - "When 'ik' is followed by 'ach', it becomes 'yan'"
+    - "इक् के स्थान पर यण् हो जाता है अच् के पारे होने पर"
+    """)
+    
+    rule_instruction = st.text_area("Enter grammar rule instruction:", 
+                                  placeholder="Example: iko yan achi (when 'ik' vowels are followed by vowels, they change to corresponding semivowels)")
+    
+    if rule_instruction and st.button("Learn Rule"):
+        with st.spinner("Learning grammar rule..."):
+            rule_result = sanskrit_nlp.learn_grammar_rule(rule_instruction)
+            
+            if rule_result["success"]:
+                st.success(f"Successfully learned rule: {rule_result['rule']['name']}")
+                
+                st.write("#### Rule Details")
+                st.json({
+                    "name": rule_result['rule']['name'],
+                    "description": rule_result['rule']['description'],
+                    "examples": rule_result['rule']['examples'],
+                    "transformations": len(rule_result['mappings'])
+                })
+                
+                # Show some example transformations
+                st.write("#### Example Transformations")
+                
+                for i, (rule_key, result) in enumerate(list(rule_result['mappings'].items())[:5]):
+                    st.code(f"{rule_key} → {result}")
+                
+                if len(rule_result['mappings']) > 5:
+                    st.write(f"... and {len(rule_result['mappings']) - 5} more transformations")
+            else:
+                st.error(f"Failed to learn rule: {rule_result['error']}")
+                st.write("Try reformulating your instruction to match the pattern: 'replace X with Y when followed by Z'")
+    
+    # Apply learned rules
+    if st.session_state.sanskrit_text and st.button("Apply Learned Rules"):
+        with st.spinner("Applying learned grammar rules..."):
+            application_result = sanskrit_nlp.apply_learned_rules(st.session_state.sanskrit_text)
+            
+            if application_result["success"] and application_result["changes"]:
+                st.success(f"Applied {len(application_result['changes'])} rule transformations")
+                
+                st.write("#### Transformed Text")
+                st.write(application_result["processed_text"])
+                
+                st.write("#### Applied Changes")
+                for change in application_result["changes"]:
+                    st.code(f"{change['original']} → {change['result']} (Rule: {change['rule_applied']})")
+            else:
+                st.info("No rules applicable to the current text or no rules learned yet")
+    
+    # Show all learned rules
+    if st.button("Show Learned Rules"):
+        rules = sanskrit_nlp.get_learned_rules()
+        
+        if rules:
+            st.write(f"#### {len(rules)} Learned Rules")
+            
+            for i, rule in enumerate(rules):
+                with st.expander(f"Rule {i+1}: {rule['name']}"):
+                    st.write(f"**Description:** {rule['description']}")
+                    st.write(f"**Groups:** {rule['source_group']} → {rule['target_group']} when followed by {rule['condition_group']}")
+                    st.write(f"**Examples:** {rule['examples'][0]['input']} → {rule['examples'][0]['output']}")
+                    st.write(f"**Total transformations:** {rule['rule_count']}")
+        else:
+            st.info("No grammar rules learned yet")
     
     # Analysis options
     if st.session_state.sanskrit_text:
@@ -228,6 +312,142 @@ elif app_mode == "Sanskrit NLP":
                     file_name=f"sanskrit_analysis.{export_format.lower()}",
                     mime=data_processor.get_mime_type(export_format)
                 )
+
+# General Instruction Learning page
+elif app_mode == "General Instruction Learning":
+    st.title("General Instruction Learning")
+    
+    st.markdown("""
+    This module allows the system to learn from any natural language instruction in any language.
+    You can teach it definitions, translations, mathematical equations, and more.
+    
+    ### Examples of instructions it can learn:
+    - **Definitions**: "Travel means to go from one place to another" or "सफर का मतलब एक जगह से दूसरी जगह जाना है"
+    - **Equations**: "4 + 3 = 7" or "10 - 5 = 5"
+    - **Translations**: "Hello in Hindi is नमस्ते" or "Good morning in Spanish is Buenos días"
+    
+    After learning, you can ask questions to apply this knowledge.
+    """)
+    
+    # Learning section
+    st.subheader("Learn New Instructions")
+    
+    instruction_text = st.text_area(
+        "Enter instruction to learn:", 
+        placeholder="For example: 'travel means to journey from one place to another' or '5 + 7 = 12'"
+    )
+    
+    if instruction_text and st.button("Learn Instruction"):
+        with st.spinner("Learning from instruction..."):
+            learning_result = instruction_learner.learn_instruction(instruction_text)
+            
+            if learning_result["success"]:
+                st.success("Successfully learned from instruction!")
+                
+                # Display different details based on the type of instruction
+                if learning_result["learned_type"] == "definition":
+                    st.write(f"#### Learned Definition")
+                    st.write(f"**{learning_result['details']['key']}** means **{learning_result['details']['value']}**")
+                
+                elif learning_result["learned_type"] == "equation":
+                    st.write(f"#### Learned Equation")
+                    st.write(f"I understand that **{learning_result['details']['equation']}**")
+                
+                elif learning_result["learned_type"] == "translation":
+                    st.write(f"#### Learned Translation")
+                    st.write(f"The word **{learning_result['details']['word']}** in {learning_result['details']['language']} is **{learning_result['details']['translation']}**")
+                
+                else:  # generic instruction
+                    st.write(f"#### Learned Instruction")
+                    st.write(f"I've recorded: {learning_result['details']['instruction']}")
+                
+                # Save what we've learned
+                instruction_learner.save_instructions()
+                
+                # Update session state
+                st.session_state.learned_instructions = instruction_learner.get_learned_knowledge()
+            else:
+                st.error(f"Failed to learn from instruction: {learning_result['error']}")
+                st.write("Try reformulating your instruction in a clearer way.")
+    
+    # Query section
+    st.subheader("Apply Learned Knowledge")
+    
+    query_text = st.text_area(
+        "Enter your query:", 
+        placeholder="For example: 'What does travel mean?' or 'What is 5 + 7?'",
+        value=st.session_state.instruction_query
+    )
+    
+    if query_text:
+        st.session_state.instruction_query = query_text
+    
+    if st.session_state.instruction_query and st.button("Ask"):
+        with st.spinner("Applying learned knowledge..."):
+            query_result = instruction_learner.apply_learned_knowledge(st.session_state.instruction_query)
+            st.session_state.query_results = query_result
+    
+    # Display query results
+    if st.session_state.query_results:
+        st.write("#### Query Results")
+        
+        if st.session_state.query_results["success"]:
+            st.info(st.session_state.query_results["explanation"])
+            
+            st.json({
+                "query_type": st.session_state.query_results["query_type"],
+                "result": st.session_state.query_results["result"]
+            })
+        else:
+            st.warning(st.session_state.query_results["error"])
+    
+    # Show all learned knowledge
+    st.subheader("Knowledge Base")
+    
+    # Filter options
+    knowledge_types = ["All Knowledge", "Definitions", "Equations", "Translations", "Generic Instructions"]
+    selected_type = st.selectbox("Filter by type:", knowledge_types)
+    
+    filter_map = {
+        "All Knowledge": None,
+        "Definitions": "definition",
+        "Equations": "equation",
+        "Translations": "translation",
+        "Generic Instructions": "generic"
+    }
+    
+    # Get and display knowledge
+    if st.button("Show Knowledge Base"):
+        filter_type = filter_map[selected_type]
+        knowledge = instruction_learner.get_learned_knowledge(filter_type)
+        
+        if knowledge:
+            st.write(f"#### {len(knowledge)} Learned Items")
+            
+            for i, item in enumerate(knowledge):
+                type_labels = {
+                    "definition": "Definition",
+                    "equation": "Equation",
+                    "translation": "Translation",
+                    "generic": "Instruction"
+                }
+                
+                type_label = type_labels.get(item["type"], "Item")
+                
+                if item["type"] == "definition":
+                    title = f"{type_label} {i+1}: {item['key']} means {item['value']}"
+                elif item["type"] == "equation":
+                    title = f"{type_label} {i+1}: {item['equation']}"
+                elif item["type"] == "translation":
+                    title = f"{type_label} {i+1}: {item['word']} in {item['language']}"
+                else:
+                    title = f"{type_label} {i+1}"
+                
+                with st.expander(title):
+                    st.write(f"**Original instruction:** {item['original_instruction']}")
+                    st.json(item)
+        else:
+            st.info(f"No knowledge of type '{selected_type}' has been learned yet.")
 
 # Custom Model Training page
 elif app_mode == "Custom Model Training":

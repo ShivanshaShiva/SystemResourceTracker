@@ -381,23 +381,29 @@ class SanskritNLP:
             condition_chars = self.char_groups.get(condition_group, [])
             
             # If any group wasn't found, try with different casing/variations
-            if not source_chars:
+            if not source_chars and source_group is not None:
                 for group, chars in self.char_groups.items():
-                    if group.lower() == source_group.lower() or group.replace('_', '') == source_group.lower():
+                    if (isinstance(group, str) and isinstance(source_group, str) and 
+                        (group.lower() == source_group.lower() or 
+                         (hasattr(group, 'replace') and group.replace('_', '') == source_group.lower()))):
                         source_chars = chars
                         source_group = group
                         break
             
-            if not target_chars:
+            if not target_chars and target_group is not None:
                 for group, chars in self.char_groups.items():
-                    if group.lower() == target_group.lower() or group.replace('_', '') == target_group.lower():
+                    if (isinstance(group, str) and isinstance(target_group, str) and 
+                        (group.lower() == target_group.lower() or 
+                         (hasattr(group, 'replace') and group.replace('_', '') == target_group.lower()))):
                         target_chars = chars
                         target_group = group
                         break
             
-            if not condition_chars:
+            if not condition_chars and condition_group is not None:
                 for group, chars in self.char_groups.items():
-                    if group.lower() == condition_group.lower() or group.replace('_', '') == condition_group.lower():
+                    if (isinstance(group, str) and isinstance(condition_group, str) and 
+                        (group.lower() == condition_group.lower() or 
+                         (hasattr(group, 'replace') and group.replace('_', '') == condition_group.lower()))):
                         condition_chars = chars
                         condition_group = group
                         break

@@ -3,12 +3,43 @@ import pandas as pd
 import numpy as np
 import io
 import os
-from utils.sanskrit_nlp import SanskritNLP
+import streamlit as st
+from model_handler import ModelHandler, ModelType
 from utils.data_processor import DataProcessor
 from utils.visualizer import Visualizer
-from utils.model_trainer import ModelTrainer
 from utils.code_generator import CodeGenerator
-from utils.instruction_learner import InstructionLearner
+
+# Initialize handler
+handler = ModelHandler()
+
+# Create API key input section in sidebar
+with st.sidebar.expander("API Configuration"):
+    gemma_key = st.text_input("Gemma API Key", type="password")
+    chatgpt_key = st.text_input("ChatGPT API Key", type="password")
+    qiskit_key = st.text_input("IBM Quantum API Key", type="password")
+    
+    if st.button("Save API Keys"):
+        if gemma_key:
+            handler.initialize_model(ModelType.GEMMA, gemma_key)
+            st.success("Gemma initialized!")
+        if chatgpt_key:
+            handler.initialize_model(ModelType.CHATGPT, chatgpt_key)
+            st.success("ChatGPT initialized!")
+        if qiskit_key:
+            handler.initialize_model(ModelType.QISKIT, qiskit_key)
+            st.success("Qiskit initialized!")
+
+# Add offline Gemma model loading
+with st.sidebar.expander("Load Local Gemma Model"):
+    local_path = st.text_input("Local Model Path", 
+                              value="/storage/emulated/0/gemma_models/",
+                              help="Path to Gemma model on device")
+    if st.button("Load Local Model"):
+        try:
+            handler.initialize_model(ModelType.GEMMA, "", local_path=local_path)
+            st.success("Local Gemma model loaded!")
+        except Exception as e:
+            st.error(f"Failed to load model: {e}")
 
 # Set page configuration
 st.set_page_config(

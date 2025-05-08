@@ -6,10 +6,10 @@ packages = ["cargo", "glibcLocales", "libiconv", "rustc"]
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["streamlit", "run", "app.py", "--server.port", "5000"]
+run = ["sh", "-c", "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"]
 
 [workflows]
-runButton = "Project"
+runButton = "Run"
 
 [[workflows.workflow]]
 name = "Project"
@@ -28,6 +28,15 @@ author = "agent"
 task = "shell.exec"
 args = "streamlit run app.py --server.port 5000"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Run"
+author = 32471993
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
 
 [[ports]]
 localPort = 5000

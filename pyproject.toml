@@ -1,18 +1,10 @@
-[project]
-name = "repl-nix-workspace"
-version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.11"
-dependencies = [
-    "anthropic>=0.51.0",
-    "gitpython>=3.1.44",
-    "nltk>=3.9.1",
-    "numpy>=2.2.5",
-    "openai>=1.77.0",
-    "pandas>=2.2.3",
-    "plotly>=6.0.1",
-    "scikit-learn>=1.6.1",
-    "streamlit>=1.45.0",
-    "tiktoken>=0.9.0",
-    "trafilatura>=2.0.0",
-]
+[tool.uv.sources]
+XAISuite = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+'Linux'" }]
+TPOT = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }, { index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+TTS = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }, { index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+TorchCRF = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }, { index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+TotalSegmentator = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+UtilsRL = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }, { index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+WhisperSpeech = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+XAISuite = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
